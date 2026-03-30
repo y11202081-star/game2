@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Runner - 賽博外送員</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        canvas {
+            border: 2px solid #0ff;
+            box-shadow: 0 0 20px #0ff;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+        }
+        .ui {
+            position: absolute;
+            color: #0ff;
+            text-shadow: 0 0 10px #0ff;
+            pointer-events: none;
+        }
+        #score { top: 20px; left: 20px; font-size: 24px; }
+        #msg { font-size: 48px; display: none; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="score" class="ui">SCORE: 0</div>
+    <div id="msg" class="ui">GAME OVER<br><span style="font-size: 20px;">點擊畫面重新開始</span></div>
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+const msgElement = document.getElementById('msg');
+
+// 遊戲設定
+canvas.width = 800;
+canvas.height = 400;
+
+let score = 0;
+let gameActive = true;
+let speed = 5;
+let frames = 0;
+
+// 玩家物件
+const player = {
+    x: 50,
+    y: 300,
+    width: 30,
+    height: 30,
+    color: '#0ff',
+    dy: 0,
+    jumpForce: 12,
+    gravity: 0.6,
+    grounded: false,
+    jumpCount: 0
+};
+
+// 障礙物與收集品陣列
+let obstacles = [];
+let particles = [];
+
+// 監聽操作
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') jump();
+});
+canvas.addEventListener('mousedown', () => {
+    if (!gameActive) restart();
+    else jump();
+});
+
+function jump() {
+    if (player.jumpCount < 2) {
+        player.dy = -player.jumpForce;
+        player.jumpCount++;
+    }
+}
+
+function restart() {
+    score = 0;
+    speed = 5;
+    obstacles = [];
+    gameActive = true;
+    msgElement.style.display = 'none';
+    animate();
+}
+
+function spawnObstacle() {
+    if (frames % 70 === 0) {
+        let h = Math.random() * 50 + 20;
+        obstacles.push({
+            x: canvas.width,
+            y: canvas.height - h - 20,
+            width: 30,
+            height: h,
+            color: '#f0f' // 霓虹紫
+        });
+    }
+}
+
+function update() {
+    if (!gameActive) return;
+
+    frames++;
+    score++;
+    scoreElement.innerText = `SCORE: ${score}`;
+
+    // 重力邏輯
+    player.dy += player.gravity;
+    player.y += player.dy;
+
+    if (player.y + player.height > canvas.height - 20) {
+        player.y = canvas.height - 20 - player.height;
+        player.dy = 0;
+        player.grounded = true;
+        player.jumpCount = 0;
+    }
+
+    // 障礙物邏輯
+    spawnObstacle();
+    obstacles.forEach((obs, index) => {
+        obs.x -= speed;
+
+        // 碰撞檢測
+        if (player.x < obs.x + obs.width &&
+            player.x + player.width > obs.x &&
+            player.y < obs.y + obs.height &&
+            player.y + player.height > obs.y) {
+            gameOver();
+        }
+
+        if (obs.x + obs.width < 0) obstacles.splice(index, 1);
+    });
+
+    // 難度增加
+    if (score % 500 === 0) speed += 0.5;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 畫地板
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height - 20);
+    ctx.lineTo(canvas.width, canvas.height - 20);
+    ctx.stroke();
+
+    // 畫玩家 (帶發光效果)
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#0ff';
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    // 畫障礙物
+    ctx.shadowColor = '#f0f';
+    obstacles.forEach(obs => {
+        ctx.fillStyle = obs.color;
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    });
+    
+    ctx.shadowBlur = 0;
+}
+
+function gameOver() {
+    gameActive = false;
+    msgElement.style.display = 'block';
+}
+
+function animate() {
+    if (!gameActive) return;
+    update();
+    draw();
+    requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
